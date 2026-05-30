@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Loan Repayment Calculator (UK) — Monthly, weekly, yearly + interest</title>
+  <meta name="description" content="Loan repayment calculator: estimate monthly payment, total interest, weekly/monthly/yearly costs, and see an interactive balance chart. Includes optional monthly overpayment." />
+  <link rel="canonical" href="/tools/loan-repayment-calculator" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="/index.html#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Loan repayment calculator</h1>
+      <p class="lede">Estimate repayments for a standard amortising loan: monthly payment, weekly/monthly/yearly cost, total interest, and an interactive balance chart.</p>
+    </section>
+
+    <section class="card">
+      <h2>Inputs</h2>
+
+      <div class="grid">
+        <div>
+          <div class="field">
+            <label for="principal">Loan amount (£)</label>
+            <input id="principal" class="control" inputmode="decimal" autocomplete="off" placeholder="e.g. 10000" />
+            <div class="help">The amount you borrow.</div>
+          </div>
+
+          <div class="field">
+            <label for="rate">Interest rate (APR %)</label>
+            <input id="rate" class="control" inputmode="decimal" autocomplete="off" placeholder="e.g. 9.9" />
+            <div class="help">Uses a simple nominal monthly rate = APR/12.</div>
+          </div>
+
+          <div class="field">
+            <label for="years">Term</label>
+            <div class="row">
+              <input id="years" class="control" inputmode="numeric" autocomplete="off" placeholder="e.g. 3" style="max-width:160px" />
+              <span class="muted" style="align-self:center">years</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="overpay">Optional overpayment (£/month)</label>
+            <input id="overpay" class="control" inputmode="decimal" autocomplete="off" placeholder="e.g. 25" />
+            <div class="help">Simple model: overpayment reduces balance immediately. Real lenders may have rules/fees.</div>
+          </div>
+
+          <div class="row">
+            <button id="reset" class="btn btn-ghost" type="button">Reset</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="margin:0">
+            <div class="label">Monthly payment</div>
+            <div id="outMonthly" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Weekly cost (approx)</div>
+            <div id="outWeekly" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Yearly cost (approx)</div>
+            <div id="outYearly" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Total interest</div>
+            <div id="outInterest" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Total repaid</div>
+            <div id="outTotal" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Payoff time (with overpayments)</div>
+            <div id="outPayoff" class="value">—</div>
+
+            <p id="status" class="small" style="margin-top:10px">Tip: try £10,000 at 9.9% over 3 years.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart" aria-label="Balance over time chart">
+        <svg id="chart" viewBox="0 0 600 180" width="100%" height="180" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="legend" aria-label="Chart legend">
+        <div class="legend-item"><span class="swatch" style="background:#2563eb"></span> Balance</div>
+      </div>
+
+      <details>
+        <summary>Show first 12 months breakdown</summary>
+        <div id="tableWrap" class="small" style="margin-top:10px"></div>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Notes</h2>
+      <ul>
+        <li>This is an estimate. Lenders may calculate interest daily, include fees, or apply different compounding.</li>
+        <li>Weekly/yearly figures are approximations based on the monthly payment (weekly = yearly/52; yearly = monthly × 12).</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/tools/mortgage-calculator">Mortgage calculator</a></li>
+        <li><a href="/tools/take-home-pay-uk">Take-home pay (UK)</a></li>
+        <li><a href="/tools/council-tax">Council tax helper</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const principalEl = $('principal');
+    const rateEl = $('rate');
+    const yearsEl = $('years');
+    const overpayEl = $('overpay');
+
+    const outMonthly = $('outMonthly');
+    const outWeekly = $('outWeekly');
+    const outYearly = $('outYearly');
+    const outInterest = $('outInterest');
+    const outTotal = $('outTotal');
+    const outPayoff = $('outPayoff');
+    const statusEl = $('status');
+
+    const chart = $('chart');
+    const tableWrap = $('tableWrap');
+
+    function parseNum(s) {
+      if (typeof s !== 'string') return NaN;
+      const cleaned = s.replace(/,/g, '').trim();
+      if (!cleaned) return NaN;
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function fmtGBP(n, decimals = 2) {
+      if (!Number.isFinite(n)) return '£—';
+      return new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'GBP',
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(n);
+    }
+
+    function fmtGBP0(n) {
+      if (!Number.isFinite(n)) return '£—';
+      return new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'GBP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(n);
+    }
+
+    function monthlyPayment(P, aprPct, years) {
+      const n = Math.round(years * 12);
+      if (n <= 0) return NaN;
+      const r = (aprPct / 100) / 12;
+      if (r === 0) return P / n;
+      const pow = Math.pow(1 + r, n);
+      return P * (r * pow) / (pow - 1);
+    }
+
+    function simulate(P, aprPct, years, overpayMonthly) {
+      const r = (aprPct / 100) / 12;
+      const base = monthlyPayment(P, aprPct, years);
+      if (!Number.isFinite(base)) return null;
+
+      const pay = base + Math.max(0, overpayMonthly || 0);
+
+      let bal = P;
+      let totalPaid = 0;
+      let totalInterest = 0;
+
+      const series = [];
+      series.push({ month: 0, balance: bal });
+
+      const rows = [];
+
+      const maxMonths = Math.round(years * 12);
+      for (let m = 1; m <= maxMonths + 12 * 40; m++) {
+        if (bal <= 0) break;
+
+        const interest = (r === 0) ? 0 : bal * r;
+        let principalPaid = pay - interest;
+
+        if (principalPaid <= 0) {
+          return { error: 'Payment does not cover interest (rate too high for payment).' };
+        }
+
+        if (principalPaid > bal) principalPaid = bal;
+
+        bal = bal - principalPaid;
+        totalPaid += (principalPaid + interest);
+        totalInterest += interest;
+
+        if (m % 12 === 0) series.push({ month: m, balance: Math.max(0, bal) });
+
+        if (m <= 12) {
+          rows.push({
+            m,
+            payment: principalPaid + interest,
+            interest,
+            principal: principalPaid,
+            balance: Math.max(0, bal)
+          });
+        }
+
+        if (m > 2000) break;
+      }
+
+      const payoffMonths = series.length ? series[series.length - 1].month : NaN;
+      return { baseMonthly: base, payMonthly: pay, totalPaid, totalInterest, payoffMonths, series, rows };
+    }
+
+    function drawLine(points, color) {
+      const w = 600, h = 180;
+      const pad = 14;
+      const innerW = w - pad * 2;
+      const innerH = h - pad * 2;
+
+      const pts = points.map(p => {
+        const x = pad + p.x * innerW;
+        const y = pad + (1 - p.y) * innerH;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      }).join(' ');
+
+      chart.innerHTML = `
+        <rect x="0" y="0" width="${w}" height="${h}" fill="transparent"></rect>
+        <polyline fill="none" stroke="${color}" stroke-width="3" points="${pts}" />
+      `;
+    }
+
+    function renderTable(rows) {
+      if (!rows || !rows.length) { tableWrap.innerHTML = '<div>—</div>'; return; }
+
+      const head = `
+        <div style="overflow:auto">
+          <table style="width:100%; border-collapse:separate; border-spacing:0 8px;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:6px 8px; color:var(--muted); font-weight:600;">Month</th>
+                <th style="text-align:right; padding:6px 8px; color:var(--muted); font-weight:600;">Payment</th>
+                <th style="text-align:right; padding:6px 8px; color:var(--muted); font-weight:600;">Interest</th>
+                <th style="text-align:right; padding:6px 8px; color:var(--muted); font-weight:600;">Principal</th>
+                <th style="text-align:right; padding:6px 8px; color:var(--muted); font-weight:600;">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      const body = rows.map(r => {
+        return `
+          <tr>
+            <td style="padding:10px 8px; border:1px solid var(--border); border-right:none; border-radius:12px 0 0 12px; background:color-mix(in srgb, var(--bg1) 78%, transparent);">${r.m}</td>
+            <td style="padding:10px 8px; border:1px solid var(--border); border-left:none; border-right:none; text-align:right; background:color-mix(in srgb, var(--bg1) 78%, transparent);">${fmtGBP(r.payment, 2)}</td>
+            <td style="padding:10px 8px; border:1px solid var(--border); border-left:none; border-right:none; text-align:right; background:color-mix(in srgb, var(--bg1) 78%, transparent);">${fmtGBP(r.interest, 2)}</td>
+            <td style="padding:10px 8px; border:1px solid var(--border); border-left:none; border-right:none; text-align:right; background:color-mix(in srgb, var(--bg1) 78%, transparent);">${fmtGBP(r.principal, 2)}</td>
+            <td style="padding:10px 8px; border:1px solid var(--border); border-left:none; border-radius:0 12px 12px 0; text-align:right; background:color-mix(in srgb, var(--bg1) 78%, transparent);">${fmtGBP(r.balance, 2)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const foot = `
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      tableWrap.innerHTML = head + body + foot;
+    }
+
+    function calc() {
+      const P = parseNum(principalEl.value);
+      const apr = parseNum(rateEl.value);
+      const yrs = parseNum(yearsEl.value);
+      const over = parseNum(overpayEl.value);
+
+      outMonthly.textContent = '£—';
+      outWeekly.textContent = '£—';
+      outYearly.textContent = '£—';
+      outInterest.textContent = '£—';
+      outTotal.textContent = '£—';
+      outPayoff.textContent = '—';
+      chart.innerHTML = '';
+      tableWrap.innerHTML = '';
+
+      if (!Number.isFinite(P) || P <= 0) { statusEl.textContent = 'Enter a valid loan amount.'; return; }
+      if (!Number.isFinite(apr) || apr < 0 || apr > 99) { statusEl.textContent = 'Enter a valid APR.'; return; }
+      if (!Number.isFinite(yrs) || yrs <= 0 || yrs > 60) { statusEl.textContent = 'Enter a valid term (years).'; return; }
+
+      const sim = simulate(P, apr, yrs, Number.isFinite(over) ? over : 0);
+      if (!sim) { statusEl.textContent = 'Could not calculate.'; return; }
+      if (sim.error) { statusEl.textContent = sim.error; return; }
+
+      outMonthly.textContent = fmtGBP(sim.payMonthly, 2);
+      outYearly.textContent = fmtGBP(sim.payMonthly * 12, 2);
+      outWeekly.textContent = fmtGBP((sim.payMonthly * 12) / 52, 2);
+      outInterest.textContent = fmtGBP0(sim.totalInterest);
+      outTotal.textContent = fmtGBP0(sim.totalPaid);
+
+      const pm = sim.payoffMonths;
+      const py = Math.floor(pm / 12);
+      const pmo = pm % 12;
+      outPayoff.textContent = `${py}y ${pmo}m`;
+
+      const xs = sim.series;
+      const maxMonth = xs[xs.length - 1].month || 1;
+      const pts = xs.map(d => ({ x: d.month / maxMonth, y: d.balance / P }));
+      drawLine(pts, '#2563eb');
+
+      renderTable(sim.rows);
+
+      statusEl.textContent = 'Updated.';
+    }
+
+    $('reset').addEventListener('click', () => {
+      principalEl.value = '10000';
+      rateEl.value = '9.9';
+      yearsEl.value = '3';
+      overpayEl.value = '';
+      calc();
+    });
+
+    for (const el of [principalEl, rateEl, yearsEl, overpayEl]) {
+      el.addEventListener('input', calc);
+      el.addEventListener('change', calc);
+    }
+
+    principalEl.value = '10000';
+    rateEl.value = '9.9';
+    yearsEl.value = '3';
+    calc();
+  </script>
+</body>
+</html>
