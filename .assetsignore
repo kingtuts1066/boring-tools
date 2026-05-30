@@ -1,0 +1,4 @@
+# Prevent uploading server-side worker code as a public asset
+_worker.js
+wrangler.jsonc
+.wrangler/
