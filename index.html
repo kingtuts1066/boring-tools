@@ -10,25 +10,59 @@
   <link rel="stylesheet" href="/assets/site.css" />
 </head>
 <body>
-  <header class="wrap">
-    <h1>Boring Tools UK</h1>
-    <p class="lede">Single-page tools that load fast and do one job well. UK-first, expanding later.</p>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
   </header>
 
   <main class="wrap">
-    <section>
-      <h2>Tools</h2>
+    <section class="hero">
+      <h1>Simple tools. Fast. Accurate.</h1>
+      <p class="lede">A collection of single-page web utilities that do one job well. UK-first, expanding later.</p>
+    </section>
+
+    <section aria-label="Featured tools" class="featured">
+      <div class="section-head">
+        <h2>Featured</h2>
+        <p class="muted">The most useful tools, first.</p>
+      </div>
+
+      <div class="tiles">
+        <a class="tile" href="/tools/whats-my-ip.html">
+          <div class="tile-title">What’s my IP</div>
+          <div class="tile-desc">IPv4/IPv6, user agent, timezone</div>
+          <div class="tile-cta">Open →</div>
+        </a>
+      </div>
+    </section>
+
+    <section id="tools">
+      <div class="section-head">
+        <h2>All tools</h2>
+        <p class="muted">Every tool is a single HTML page, SEO-focused, and linkable.</p>
+      </div>
+
       <input id="toolSearch" class="search" type="search" placeholder="Search tools…" autocomplete="off" />
       <ul id="toolList" class="tool-list">
         <li>
-          <a href="/tools/whats-my-ip.html">What's my IP</a>
+          <a href="/tools/whats-my-ip.html">What’s my IP</a>
           <span class="meta">IPv4/IPv6, user agent, timezone</span>
         </li>
       </ul>
     </section>
 
     <section>
-      <h2>About</h2>
+      <div class="section-head">
+        <h2>About</h2>
+        <p class="muted">Why this exists.</p>
+      </div>
       <p>This site is a collection of standalone HTML pages. Each tool has its own page for SEO and speed, and they all link back here.</p>
     </section>
   </main>

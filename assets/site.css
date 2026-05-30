@@ -20,6 +20,8 @@
   --radius:16px;
   --radius2:12px;
   --ring: 0 0 0 4px rgba(37, 99, 235, .18);
+  --topbar: rgba(255,255,255,.60);
+  --topbar-border: rgba(17,24,39,.10);
 }
 
 @media (prefers-color-scheme: dark){
@@ -34,6 +36,8 @@
     --shadow: 0 16px 40px rgba(0,0,0,.55);
     --shadow2: 0 3px 14px rgba(0,0,0,.40);
     --ring: 0 0 0 4px rgba(122, 162, 255, .20);
+    --topbar: rgba(15,17,22,.55);
+    --topbar-border: rgba(255,255,255,.10);
   }
 }
 
@@ -47,12 +51,57 @@ body{
     radial-gradient(900px 500px at 85% 0%, rgba(16,185,129,.10), transparent 55%),
     linear-gradient(180deg, var(--bg0), var(--bg1));
   color:var(--text);
-  line-height:1.55;
+  line-height:1.60;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 .wrap{max-width:980px;margin:0 auto;padding:28px}
+
+/* Top navigation */
+.topbar{
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--topbar);
+  border-bottom: 1px solid var(--topbar-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.topbar-inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding-top:14px;
+  padding-bottom:14px;
+}
+
+.brand{
+  font-weight:700;
+  letter-spacing:-0.02em;
+  color: var(--text);
+}
+
+.brand:hover{ text-decoration:none; }
+
+.nav{ display:flex; gap:14px; flex-wrap:wrap; justify-content:flex-end; }
+.nav a{ color: var(--muted); font-weight:550; }
+.nav a:hover{ color: var(--text); text-decoration:none; }
+
+/* Hero + sections */
+.hero{ padding: 18px 0 6px 0; }
+
+.section-head{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+  margin-top: 10px;
+}
+
+.muted{ color: var(--muted); margin: 0; }
 
 h1{
   margin:0 0 10px 0;
@@ -99,11 +148,34 @@ a:hover{text-decoration:underline}
 
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 
-@media (max-width:720px){
-  .wrap{padding:20px}
-  h1{font-size:34px}
-  .grid{grid-template-columns:1fr}
+/* Featured tiles */
+.tiles{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 10px 0 6px 0;
 }
+
+.tile{
+  display:block;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg1) 80%, transparent);
+  box-shadow: var(--shadow2);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+.tile:hover{
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: color-mix(in srgb, var(--link) 25%, var(--border));
+  text-decoration:none;
+}
+
+.tile-title{ font-weight:700; letter-spacing:-0.01em; color: var(--text); }
+.tile-desc{ color: var(--muted); margin-top: 4px; font-size: 13px; }
+.tile-cta{ margin-top: 10px; color: var(--link); font-weight:600; font-size: 13px; }
 
 .label{
   color:var(--muted);
@@ -174,6 +246,14 @@ details > summary{
 
 details[open]{
   box-shadow: var(--shadow2);
+}
+
+@media (max-width:720px){
+  .wrap{padding:20px}
+  h1{font-size:34px}
+  .grid{grid-template-columns:1fr}
+  .tiles{grid-template-columns:1fr}
+  .topbar-inner{padding-top:12px;padding-bottom:12px}
 }
 
 /* selection */
