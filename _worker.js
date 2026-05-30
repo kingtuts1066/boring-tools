@@ -1,6 +1,26 @@
+const CANONICAL_HOST = 'boringbutstilluseful.co.uk';
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    // --- Canonical host redirect (SEO-safe) ---
+    // Keep workers.dev preview/testing URLs working (no redirect there).
+    const host = url.hostname;
+    const isWorkersDev = host.endsWith('.workers.dev');
+    const isCanonical = host === CANONICAL_HOST;
+    if (!isWorkersDev && !isCanonical) {
+      const dest = new URL(request.url);
+      dest.protocol = 'https:';
+      dest.hostname = CANONICAL_HOST;
+      return new Response(null, {
+        status: 301,
+        headers: {
+          location: dest.toString(),
+          'cache-control': 'no-store'
+        }
+      });
+    }
 
     // --- API routes (same-origin) ---
     if (url.pathname === '/api/ping') {
