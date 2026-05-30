@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VAT Calculator (UK) — Add or remove VAT</title>
+  <meta name="description" content="UK VAT calculator: add VAT to a net price or remove VAT from a gross price. Standard 20%, reduced 5%, zero 0%, or custom rate." />
+  <link rel="canonical" href="/tools/vat-calculator.html" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="/index.html#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>VAT calculator</h1>
+      <p class="lede">Add VAT to a net amount, or remove VAT from a gross amount. UK-first: standard (20%), reduced (5%), zero (0%) — plus custom.</p>
+    </section>
+
+    <section class="card">
+      <h2>Calculate</h2>
+
+      <div class="grid">
+        <div>
+          <div class="field">
+            <label for="mode">Mode</label>
+            <select id="mode" class="control">
+              <option value="add">Add VAT (net → gross)</option>
+              <option value="remove">Remove VAT (gross → net)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="rate">VAT rate</label>
+            <select id="rate" class="control">
+              <option value="20" selected>Standard — 20%</option>
+              <option value="5">Reduced — 5%</option>
+              <option value="0">Zero — 0%</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </div>
+
+          <div id="customWrap" class="field" hidden>
+            <label for="customRate">Custom rate (%)</label>
+            <input id="customRate" class="control" inputmode="decimal" autocomplete="off" placeholder="e.g. 17.5" />
+            <div class="help">Enter a percentage (0–100). Example: 17.5</div>
+          </div>
+
+          <div class="field">
+            <label for="amount">Amount (£)</label>
+            <input id="amount" class="control" inputmode="decimal" autocomplete="off" placeholder="e.g. 99.99" />
+            <div id="amountHelp" class="help">Enter the net amount (if adding VAT) or the gross amount (if removing VAT).</div>
+          </div>
+
+          <div class="row">
+            <button id="swap" class="btn" type="button">Swap mode</button>
+            <button id="reset" class="btn btn-ghost" type="button">Reset</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="margin:0">
+            <div class="label">Net</div>
+            <div id="outNet" class="value">£0.00</div>
+            <div class="label" style="margin-top:14px">VAT</div>
+            <div id="outVat" class="value">£0.00</div>
+            <div class="label" style="margin-top:14px">Gross</div>
+            <div id="outGross" class="value">£0.00</div>
+            <p id="status" class="small" style="margin-top:10px">Tip: type an amount — results update instantly.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Notes</h2>
+      <ul>
+        <li>Results are rounded to 2 decimal places (pennies) for display.</li>
+        <li>This is a simple calculator — it does not determine whether VAT applies to a specific good or service.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>FAQ</h2>
+
+      <details>
+        <summary>What’s the difference between net and gross?</summary>
+        <p><strong>Net</strong> is the price before VAT. <strong>Gross</strong> is the price after VAT is added.</p>
+      </details>
+
+      <details>
+        <summary>How do you remove VAT from a gross price?</summary>
+        <p>Net = Gross ÷ (1 + rate). VAT = Gross − Net.</p>
+      </details>
+
+      <details>
+        <summary>Can I use a custom VAT rate?</summary>
+        <p>Yes — choose “Custom…” and enter a percentage. (Handy for historical rates or non-UK calculations.)</p>
+      </details>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/tools/whats-my-ip.html">What’s my IP</a></li>
+        <li><a href="/tools/dns-lookup.html">DNS lookup</a></li>
+        <li><a href="/tools/internet-speed-test.html">Internet speed test</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const modeEl = $('mode');
+    const rateEl = $('rate');
+    const customWrap = $('customWrap');
+    const customRateEl = $('customRate');
+    const amountEl = $('amount');
+
+    const outNet = $('outNet');
+    const outVat = $('outVat');
+    const outGross = $('outGross');
+    const statusEl = $('status');
+    const amountHelp = $('amountHelp');
+
+    function parseNum(s) {
+      if (typeof s !== 'string') return NaN;
+      // allow commas in input
+      const cleaned = s.replace(/,/g, '').trim();
+      if (!cleaned) return NaN;
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function fmtGBP(n) {
+      if (!Number.isFinite(n)) return '—';
+      // display rounding only (keep internal as float)
+      return new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'GBP',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(n);
+    }
+
+    function getRate() {
+      if (rateEl.value === 'custom') {
+        const cr = parseNum(customRateEl.value);
+        if (!Number.isFinite(cr)) return NaN;
+        return cr / 100;
+      }
+      return Number(rateEl.value) / 100;
+    }
+
+    function updateUIHints() {
+      const mode = modeEl.value;
+      amountHelp.textContent = mode === 'add'
+        ? 'Enter the net amount (before VAT).'
+        : 'Enter the gross amount (including VAT).';
+
+      const isCustom = rateEl.value === 'custom';
+      customWrap.hidden = !isCustom;
+    }
+
+    function calculate() {
+      updateUIHints();
+
+      const mode = modeEl.value;
+      const r = getRate();
+      const amount = parseNum(amountEl.value);
+
+      // defaults
+      outNet.textContent = '£0.00';
+      outVat.textContent = '£0.00';
+      outGross.textContent = '£0.00';
+
+      if (!Number.isFinite(amount) || amount < 0) {
+        statusEl.textContent = 'Enter a valid amount (0 or more).';
+        return;
+      }
+
+      if (!Number.isFinite(r) || r < 0 || r > 1) {
+        statusEl.textContent = 'Enter a valid VAT rate (0–100).';
+        return;
+      }
+
+      let net, vat, gross;
+      if (mode === 'add') {
+        net = amount;
+        vat = net * r;
+        gross = net + vat;
+      } else {
+        gross = amount;
+        net = (r === 0) ? gross : (gross / (1 + r));
+        vat = gross - net;
+      }
+
+      outNet.textContent = fmtGBP(net);
+      outVat.textContent = fmtGBP(vat);
+      outGross.textContent = fmtGBP(gross);
+      statusEl.textContent = 'Updated.';
+    }
+
+    $('swap').addEventListener('click', () => {
+      modeEl.value = (modeEl.value === 'add') ? 'remove' : 'add';
+      calculate();
+    });
+
+    $('reset').addEventListener('click', () => {
+      modeEl.value = 'add';
+      rateEl.value = '20';
+      customRateEl.value = '';
+      amountEl.value = '';
+      calculate();
+      amountEl.focus();
+    });
+
+    for (const el of [modeEl, rateEl, customRateEl, amountEl]) {
+      el.addEventListener('input', calculate);
+      el.addEventListener('change', calculate);
+    }
+
+    calculate();
+  </script>
+</body>
+</html>

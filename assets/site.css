@@ -146,6 +146,54 @@ a:hover{text-decoration:underline}
   -webkit-backdrop-filter: blur(10px);
 }
 
+/* Form controls */
+.field{ margin: 12px 0; }
+.field label{ display:block; font-weight:600; letter-spacing:-0.01em; margin-bottom:6px; }
+.help{ color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+.control{
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border2);
+  background: color-mix(in srgb, var(--bg1) 70%, transparent);
+  color: var(--text);
+  box-shadow: 0 1px 0 rgba(17,24,39,.04);
+}
+
+.control:focus{
+  outline:none;
+  box-shadow: var(--ring);
+  border-color: color-mix(in srgb, var(--link) 45%, var(--border2));
+}
+
+.row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top: 14px; }
+
+.btn{
+  appearance:none;
+  border: 1px solid var(--border2);
+  background: color-mix(in srgb, var(--bg1) 78%, transparent);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+.btn:hover{
+  transform: translateY(-1px);
+  box-shadow: var(--shadow2);
+  border-color: color-mix(in srgb, var(--link) 25%, var(--border2));
+}
+
+.btn:focus{ outline:none; box-shadow: var(--ring); }
+
+.btn-ghost{
+  background: transparent;
+}
+
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 
 /* Featured tiles */
