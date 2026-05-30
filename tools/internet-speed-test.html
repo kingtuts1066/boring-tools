@@ -169,9 +169,11 @@
       }
 
       const t0 = now();
+      // IMPORTANT: do NOT set a custom Content-Type header here.
+      // Setting it triggers a CORS preflight on some browsers/networks, which can be blocked and show as "Failed to fetch".
+      // Sending Uint8Array without a header is still fine for timing purposes.
       const res = await fetchOk(url + '?_=' + Math.random(), {
         method: 'POST',
-        headers: { 'content-type': 'application/octet-stream' },
         body: payload
       });
       await res.arrayBuffer();
