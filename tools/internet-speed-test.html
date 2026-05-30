@@ -112,22 +112,36 @@
     function now() { return performance.now(); }
     function mbps(bytes, ms) { return (bytes * 8) / (ms / 1000) / 1e6; }
 
-    async function measureLatency(url, samples=3) {
-      // cache-bust each request
-      const times=[];
-      for (let i=0;i<samples;i++) {
+    function fetchWithAbort(url, opts = {}) {
+      const signal = aborter ? aborter.signal : undefined;
+      return fetch(url, { cache: 'no-store', signal, ...opts });
+    }
+
+    async function fetchOk(url, opts) {
+      const res = await fetchWithAbort(url, opts);
+      if (!res.ok) {
+        const err = new Error('HTTP ' + res.status);
+        err.status = res.status;
+        throw err;
+      }
+      return res;
+    }
+
+    async function measureLatency(url, samples = 3) {
+      const times = [];
+      for (let i = 0; i < samples; i++) {
         const t0 = now();
-        const res = await fetch(url + '&_=' + Math.random(), { cache:'no-store' });
+        const res = await fetchOk(url + '&_=' + Math.random());
         await res.arrayBuffer();
         times.push(now() - t0);
       }
-      times.sort((a,b)=>a-b);
-      return times[Math.floor(times.length/2)]; // median
+      times.sort((a, b) => a - b);
+      return times[Math.floor(times.length / 2)];
     }
 
-    async function downloadTest(url, bytes) {
+    async function downloadTest(baseUrl, bytes) {
       const t0 = now();
-      const res = await fetch(url + bytes + '&_=' + Math.random(), { cache:'no-store' });
+      const res = await fetchOk(baseUrl + bytes + '&_=' + Math.random());
       const buf = await res.arrayBuffer();
       const dt = now() - t0;
       return { bytes: buf.byteLength, ms: dt };
@@ -135,13 +149,16 @@
 
     async function uploadTest(url, bytes) {
       const payload = new Uint8Array(bytes);
-      crypto.getRandomValues(payload);
+      try {
+        if (crypto && crypto.getRandomValues) crypto.getRandomValues(payload);
+      } catch {
+        // If RNG fails (rare), keep zeroed payload.
+      }
+
       const t0 = now();
-      // Cloudflare endpoint expects a POST body; response includes stats but we only time it.
-      const res = await fetch(url + '&_=' + Math.random(), {
-        method:'POST',
-        cache:'no-store',
-        headers:{'content-type':'application/octet-stream'},
+      const res = await fetchOk(url + '?_=' + Math.random(), {
+        method: 'POST',
+        headers: { 'content-type': 'application/octet-stream' },
         body: payload
       });
       await res.arrayBuffer();
@@ -149,42 +166,62 @@
       return { bytes, ms: dt };
     }
 
+    function setStatus(text) {
+      elStatus.textContent = text;
+    }
+
+    function friendlyErr(e) {
+      if (!e) return 'Unknown error';
+      if (e.name === 'AbortError') return 'Stopped';
+      if (e.message) return e.message;
+      return String(e);
+    }
+
     async function run() {
       aborter = new AbortController();
       btnStart.disabled = true;
       btnStop.disabled = false;
 
+      // Reset display
+      elLatency.textContent = '—';
+      elDown.textContent = '—';
+      elUp.textContent = '—';
+
       try {
-        elStatus.textContent = 'Measuring latency…';
+        // 1) Latency
+        setStatus('Measuring latency…');
         const lat = await measureLatency('https://speed.cloudflare.com/__down?bytes=10000');
         elLatency.textContent = lat.toFixed(0);
 
-        // Download test: ramp sizes; pick the best of a couple runs.
-        elStatus.textContent = 'Testing download…';
+        // 2) Download
+        setStatus('Testing download…');
         const downRuns = [];
         for (const sz of [2_000_000, 8_000_000, 20_000_000]) {
           const r = await downloadTest('https://speed.cloudflare.com/__down?bytes=', sz);
           downRuns.push(r);
-          // stop early if already very fast
           if (mbps(r.bytes, r.ms) > 300) break;
         }
-        const bestDown = downRuns.reduce((a,b)=> mbps(a.bytes,a.ms) > mbps(b.bytes,b.ms) ? a : b);
+        const bestDown = downRuns.reduce((a, b) => mbps(a.bytes, a.ms) > mbps(b.bytes, b.ms) ? a : b);
         elDown.textContent = mbps(bestDown.bytes, bestDown.ms).toFixed(1);
 
-        // Upload test (smaller to avoid murdering mobile connections)
-        elStatus.textContent = 'Testing upload…';
-        const upRuns = [];
-        for (const sz of [1_000_000, 4_000_000, 10_000_000]) {
-          const r = await uploadTest('https://speed.cloudflare.com/__up', sz);
-          upRuns.push(r);
-          if (mbps(r.bytes, r.ms) > 100) break;
+        // 3) Upload (this is the part that sometimes fails due to browser/network policies)
+        setStatus('Testing upload…');
+        try {
+          const upRuns = [];
+          for (const sz of [500_000, 1_000_000, 4_000_000]) {
+            const r = await uploadTest('https://speed.cloudflare.com/__up', sz);
+            upRuns.push(r);
+            if (mbps(r.bytes, r.ms) > 100) break;
+          }
+          const bestUp = upRuns.reduce((a, b) => mbps(a.bytes, a.ms) > mbps(b.bytes, b.ms) ? a : b);
+          elUp.textContent = mbps(bestUp.bytes, bestUp.ms).toFixed(1);
+          setStatus('Done');
+        } catch (e) {
+          // Do not throw away latency+download if upload is blocked.
+          setStatus('Upload blocked/failed (' + friendlyErr(e) + ')');
         }
-        const bestUp = upRuns.reduce((a,b)=> mbps(a.bytes,a.ms) > mbps(b.bytes,b.ms) ? a : b);
-        elUp.textContent = mbps(bestUp.bytes, bestUp.ms).toFixed(1);
-
-        elStatus.textContent = 'Done';
       } catch (e) {
-        elStatus.textContent = 'Failed';
+        setStatus('Failed (' + friendlyErr(e) + ')');
       } finally {
         btnStart.disabled = false;
         btnStop.disabled = true;
