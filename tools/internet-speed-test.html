@@ -112,13 +112,26 @@
     function now() { return performance.now(); }
     function mbps(bytes, ms) { return (bytes * 8) / (ms / 1000) / 1e6; }
 
-    function fetchWithAbort(url, opts = {}) {
-      const signal = aborter ? aborter.signal : undefined;
-      return fetch(url, { cache: 'no-store', signal, ...opts });
+    function fetchWithAbort(url, opts = {}, timeoutMs = 20000) {
+      // Combine: (a) global abort (Stop button) + (b) per-request timeout.
+      const controller = new AbortController();
+      const onAbort = () => controller.abort();
+
+      if (aborter) aborter.signal.addEventListener('abort', onAbort, { once: true });
+
+      const timer = setTimeout(() => {
+        controller.abort();
+      }, timeoutMs);
+
+      return fetch(url, { cache: 'no-store', signal: controller.signal, ...opts })
+        .finally(() => {
+          clearTimeout(timer);
+          if (aborter) aborter.signal.removeEventListener('abort', onAbort);
+        });
     }
 
-    async function fetchOk(url, opts) {
-      const res = await fetchWithAbort(url, opts);
+    async function fetchOk(url, opts, timeoutMs) {
+      const res = await fetchWithAbort(url, opts, timeoutMs);
       if (!res.ok) {
         const err = new Error('HTTP ' + res.status);
         err.status = res.status;
@@ -196,10 +209,13 @@
         // 2) Download
         setStatus('Testing download…');
         const downRuns = [];
-        for (const sz of [2_000_000, 8_000_000, 20_000_000]) {
+        // Smaller ramp so it doesn’t hang forever on slower or lossy connections.
+        for (const sz of [1_000_000, 4_000_000, 10_000_000]) {
           const r = await downloadTest('https://speed.cloudflare.com/__down?bytes=', sz);
           downRuns.push(r);
           if (mbps(r.bytes, r.ms) > 300) break;
+          // If a single fetch is already taking a long time, don’t keep ramping.
+          if (r.ms > 12000) break;
         }
         const bestDown = downRuns.reduce((a, b) => mbps(a.bytes, a.ms) > mbps(b.bytes, b.ms) ? a : b);
         elDown.textContent = mbps(bestDown.bytes, bestDown.ms).toFixed(1);
