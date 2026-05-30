@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>What's My IP? (UK)  IPv4/IPv6 address checker</title>
+  <meta name="description" content="Instantly see your public IP address (IPv4/IPv6), plus basic connection details like user agent and timezone. No sign-up." />
+  <link rel="canonical" href="/tools/whats-my-ip.html" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="wrap">
+    <nav class="crumbs"><a href="/index.html"> All tools</a></nav>
+    <h1>What's my IP?</h1>
+    <p class="lede">Shows your public IP address (IPv4/IPv6) and a few basics about your browser.</p>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>Your public IP</h2>
+      <div class="grid">
+        <div>
+          <div class="label">IPv4</div>
+          <div id="ipv4" class="value">Loading6e</div>
+        </div>
+        <div>
+          <div class="label">IPv6</div>
+          <div id="ipv6" class="value">Loading6e</div>
+        </div>
+      </div>
+      <p class="small">Note: this is the IP address your browser presents to the internet (often your router or VPN).</p>
+    </section>
+
+    <section class="card">
+      <h2>Connection details</h2>
+      <ul class="facts">
+        <li><strong>Timezone:</strong> <span id="tz">Loading6e</span></li>
+        <li><strong>User agent:</strong> <span id="ua">Loading6e</span></li>
+        <li><strong>Language:</strong> <span id="lang">Loading6e</span></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>FAQ</h2>
+      <details>
+        <summary>Is this my private (local) IP address?</summary>
+        <p>No. This page shows your public IP (internet-facing). Your private IP usually looks like 192.168.x.x, 10.x.x.x, or 172.162.31.x.x.</p>
+      </details>
+      <details>
+        <summary>Will this page store my IP address?</summary>
+        <p>No. This tool runs in your browser and fetches your IP from a simple endpoint. Check the Privacy page for details.</p>
+      </details>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/index.html">All tools</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a>  <a href="/about.html">About</a>  <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    document.getElementById('ua').textContent = navigator.userAgent;
+    document.getElementById('lang').textContent = navigator.language || '';
+    try {
+      document.getElementById('tz').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    } catch {
+      document.getElementById('tz').textContent = '';
+    }
+
+    async function fetchText(url) {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return (await res.text()).trim();
+    }
+
+    (async () => {
+      try { document.getElementById('ipv4').textContent = await fetchText('https://api.ipify.org'); }
+      catch { document.getElementById('ipv4').textContent = 'Unavailable'; }
+
+      try { document.getElementById('ipv6').textContent = await fetchText('https://api64.ipify.org'); }
+      catch { document.getElementById('ipv6').textContent = 'Unavailable'; }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Boring Tools UK — Simple web utilities</title>
+  <meta name="description" content="Fast, boring, useful web tools: What's my IP, take-home pay, VAT calculator, and more. UK-first." />
+  <link rel="canonical" href="/" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="wrap">
+    <h1>Boring Tools UK</h1>
+    <p class="lede">Single-page tools that load fast and do one job well. UK-first, expanding later.</p>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>Tools</h2>
+      <input id="toolSearch" class="search" type="search" placeholder="Search tools…" autocomplete="off" />
+      <ul id="toolList" class="tool-list">
+        <li>
+          <a href="/tools/whats-my-ip.html">What's my IP</a>
+          <span class="meta">IPv4/IPv6, user agent, timezone</span>
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>About</h2>
+      <p>This site is a collection of standalone HTML pages. Each tool has its own page for SEO and speed, and they all link back here.</p>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+    <p class="small">© <span id="year"></span> Boring Tools UK</p>
+  </footer>
+
+  <script src="/assets/site.js" defer></script>
+</body>
+</html>
