@@ -1,0 +1,3 @@
+# ads.txt for boringbutstilluseful.co.uk
+# Google AdSense publisher
+google.com, pub-8486670881575559, DIRECT, f08c47fec0942fa0
