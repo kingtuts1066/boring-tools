@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Council Tax Helper (UK) — Monthly, weekly, yearly</title>
+  <meta name="description" content="Council tax helper: estimate monthly/weekly/daily from an annual bill, apply single person discount, and get quick UK lookup links (England/Wales/Scotland/Northern Ireland)." />
+  <link rel="canonical" href="/tools/council-tax" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="/index.html#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Council tax helper</h1>
+      <p class="lede">Turn an annual council tax bill into weekly/monthly figures, optionally apply the <b>single person discount (25%)</b>, and jump to official band/valuation lookups.</p>
+    </section>
+
+    <section class="card">
+      <h2>Quick estimate</h2>
+
+      <div class="grid">
+        <div>
+          <div class="field">
+            <label for="annual">Annual council tax bill (£/year)</label>
+            <input id="annual" class="control" inputmode="decimal" autocomplete="off" placeholder="e.g. 1800" />
+            <div class="help">Enter the figure from your bill (or a quoted annual amount from your council). This tool does not fetch council data.</div>
+          </div>
+
+          <div class="field">
+            <label for="payMonths">Payment plan</label>
+            <select id="payMonths" class="control">
+              <option value="10">10 months (common)</option>
+              <option value="12" selected>12 months</option>
+            </select>
+            <div class="help">Some councils bill over 10 instalments by default. Use what matches your bill.</div>
+          </div>
+
+          <div class="field">
+            <label for="spd">Single person discount?</label>
+            <select id="spd" class="control">
+              <option value="no" selected>No</option>
+              <option value="yes">Yes (25% off)</option>
+            </select>
+            <div class="help">Rule-of-thumb only. Discounts/exemptions depend on household circumstances and local authority rules.</div>
+          </div>
+
+          <div class="row">
+            <button id="reset" class="btn btn-ghost" type="button">Reset</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="margin:0">
+            <div class="label">Payable (yearly)</div>
+            <div id="outYear" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Monthly</div>
+            <div id="outMonth" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Weekly</div>
+            <div id="outWeek" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Daily</div>
+            <div id="outDay" class="value">£—</div>
+
+            <p id="status" class="small" style="margin-top:10px">Tip: try 1,800 with and without the single person discount.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart" aria-label="Council tax comparison chart">
+        <svg id="chart" viewBox="0 0 600 180" width="100%" height="180" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="legend" aria-label="Chart legend">
+        <div class="legend-item"><span class="swatch" style="background:#2563eb"></span> Standard</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span> With single person discount</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Band / valuation lookups (official)</h2>
+      <p class="muted">Council tax systems differ by nation. These links help you find your band/valuation.</p>
+      <ul>
+        <li><b>England & Wales:</b> Valuation Office Agency (VOA) band search: <a href="https://www.gov.uk/council-tax-bands" rel="noopener" target="_blank">gov.uk/council-tax-bands</a></li>
+        <li><b>Scotland:</b> Scottish Assessors band search: <a href="https://www.saa.gov.uk/" rel="noopener" target="_blank">saa.gov.uk</a></li>
+        <li><b>Northern Ireland:</b> Domestic rates (not bands): <a href="https://www.nidirect.gov.uk/articles/domestic-rates" rel="noopener" target="_blank">nidirect.gov.uk/articles/domestic-rates</a></li>
+      </ul>
+      <details>
+        <summary>What is this page (and what isn’t it)?</summary>
+        <p>This is a simple calculator to help you budget and sanity-check instalments. It does not calculate your band, fetch your council’s charges, or replace your bill.</p>
+      </details>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/tools/take-home-pay-uk">Take-home pay (UK)</a></li>
+        <li><a href="/tools/mortgage-calculator">Mortgage calculator</a></li>
+        <li><a href="/tools/stamp-duty-calculator">Stamp Duty (SDLT) calculator</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const annualEl = $('annual');
+    const payMonthsEl = $('payMonths');
+    const spdEl = $('spd');
+
+    const outYear = $('outYear');
+    const outMonth = $('outMonth');
+    const outWeek = $('outWeek');
+    const outDay = $('outDay');
+    const statusEl = $('status');
+    const chart = $('chart');
+
+    function parseNum(s) {
+      if (typeof s !== 'string') return NaN;
+      const cleaned = s.replace(/,/g, '').trim();
+      if (!cleaned) return NaN;
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function fmtGBP(n, decimals = 2) {
+      if (!Number.isFinite(n)) return '£—';
+      return new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'GBP',
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(n);
+    }
+
+    function drawBars(standardYear, discountedYear) {
+      const w = 600, h = 180;
+      const pad = 18;
+      const innerW = w - pad * 2;
+      const innerH = h - pad * 2;
+
+      const max = Math.max(standardYear, discountedYear, 1);
+      const barW = innerW / 2;
+
+      const bars = [
+        { v: standardYear, c: '#2563eb' },
+        { v: discountedYear, c: '#10b981' },
+      ];
+
+      let svg = `<rect x="0" y="0" width="${w}" height="${h}" fill="transparent"></rect>`;
+      bars.forEach((b, i) => {
+        const bh = (b.v / max) * innerH;
+        const x = pad + i * barW + barW * 0.18;
+        const y = pad + (innerH - bh);
+        const bw = barW * 0.64;
+        svg += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="10" ry="10" fill="${b.c}"></rect>`;
+      });
+
+      chart.innerHTML = svg;
+    }
+
+    function calc() {
+      const annual = parseNum(annualEl.value);
+      const months = Number(payMonthsEl.value);
+      const spd = spdEl.value === 'yes';
+
+      outYear.textContent = '£—';
+      outMonth.textContent = '£—';
+      outWeek.textContent = '£—';
+      outDay.textContent = '£—';
+      chart.innerHTML = '';
+
+      if (!Number.isFinite(annual) || annual <= 0) {
+        statusEl.textContent = 'Enter a valid annual amount.';
+        return;
+      }
+
+      const payable = spd ? annual * 0.75 : annual;
+
+      outYear.textContent = fmtGBP(payable, 0);
+      outMonth.textContent = fmtGBP(payable / months, 2);
+      outWeek.textContent = fmtGBP(payable / 52, 2);
+      outDay.textContent = fmtGBP(payable / 365, 2);
+
+      drawBars(annual, annual * 0.75);
+      statusEl.textContent = 'Updated.';
+    }
+
+    $('reset').addEventListener('click', () => {
+      annualEl.value = '1800';
+      payMonthsEl.value = '12';
+      spdEl.value = 'no';
+      calc();
+    });
+
+    for (const el of [annualEl, payMonthsEl, spdEl]) {
+      el.addEventListener('input', calc);
+      el.addEventListener('change', calc);
+    }
+
+    annualEl.value = '1800';
+    calc();
+  </script>
+</body>
+</html>
