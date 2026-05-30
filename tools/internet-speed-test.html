@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Internet Speed Test (UK) — Download & upload in your browser</title>
+  <meta name="description" content="Run a quick internet speed test in your browser. Measures latency, download speed, and upload speed. No install." />
+  <link rel="canonical" href="/tools/internet-speed-test.html" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="/index.html#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Internet Speed Test</h1>
+      <p class="lede">A quick browser-based test for latency, download speed, and upload speed.</p>
+    </section>
+
+    <section class="card">
+      <h2>Run test</h2>
+      <p class="muted">Tip: for best results, close large downloads/streams and test on Wi‑Fi vs Ethernet.</p>
+
+      <div class="grid">
+        <div>
+          <div class="label">Latency (ms)</div>
+          <div id="latency" class="value">—</div>
+        </div>
+        <div>
+          <div class="label">Download (Mbps)</div>
+          <div id="down" class="value">—</div>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:12px">
+        <div>
+          <div class="label">Upload (Mbps)</div>
+          <div id="up" class="value">—</div>
+        </div>
+        <div>
+          <div class="label">Status</div>
+          <div id="status" class="value" style="font-size:16px;font-weight:600">Idle</div>
+        </div>
+      </div>
+
+      <p style="margin-top:14px">
+        <button id="start" class="btn">Start test</button>
+        <button id="stop" class="btn secondary" disabled>Stop</button>
+      </p>
+      <p class="small">Uses a public Cloudflare speed endpoint. Results are estimates and can vary by route, device, and background traffic.</p>
+    </section>
+
+    <section>
+      <h2>FAQ</h2>
+      <details>
+        <summary>Why is my speed different from my ISP plan?</summary>
+        <p>Wi‑Fi quality, router hardware, VPNs, congestion, and the test server location can all reduce measured speed.</p>
+      </details>
+      <details>
+        <summary>Does this test work on mobile?</summary>
+        <p>Yes, but mobile networks can fluctuate rapidly. Try a few runs and look for a typical range.</p>
+      </details>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/tools/whats-my-ip.html">What’s my IP</a></li>
+        <li><a href="/tools/system-info.html">System info</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    // Minimal button styling without a framework
+    const style = document.createElement('style');
+    style.textContent = `
+      .btn{appearance:none;border:1px solid var(--border2);background:color-mix(in srgb, var(--bg1) 72%, transparent);
+        color:var(--text);padding:10px 14px;border-radius:999px;font-weight:650;cursor:pointer;box-shadow:0 1px 0 rgba(17,24,39,.04)}
+      .btn:hover{box-shadow:var(--shadow2)}
+      .btn:focus{outline:none;box-shadow:var(--ring)}
+      .btn.secondary{opacity:.9}
+      .btn:disabled{opacity:.5;cursor:not-allowed}
+    `;
+    document.head.appendChild(style);
+
+    const $ = (id) => document.getElementById(id);
+    const elLatency = $('latency');
+    const elDown = $('down');
+    const elUp = $('up');
+    const elStatus = $('status');
+    const btnStart = $('start');
+    const btnStop = $('stop');
+
+    let aborter = null;
+
+    function now() { return performance.now(); }
+    function mbps(bytes, ms) { return (bytes * 8) / (ms / 1000) / 1e6; }
+
+    async function measureLatency(url, samples=3) {
+      // cache-bust each request
+      const times=[];
+      for (let i=0;i<samples;i++) {
+        const t0 = now();
+        const res = await fetch(url + '&_=' + Math.random(), { cache:'no-store' });
+        await res.arrayBuffer();
+        times.push(now() - t0);
+      }
+      times.sort((a,b)=>a-b);
+      return times[Math.floor(times.length/2)]; // median
+    }
+
+    async function downloadTest(url, bytes) {
+      const t0 = now();
+      const res = await fetch(url + bytes + '&_=' + Math.random(), { cache:'no-store' });
+      const buf = await res.arrayBuffer();
+      const dt = now() - t0;
+      return { bytes: buf.byteLength, ms: dt };
+    }
+
+    async function uploadTest(url, bytes) {
+      const payload = new Uint8Array(bytes);
+      crypto.getRandomValues(payload);
+      const t0 = now();
+      // Cloudflare endpoint expects a POST body; response includes stats but we only time it.
+      const res = await fetch(url + '&_=' + Math.random(), {
+        method:'POST',
+        cache:'no-store',
+        headers:{'content-type':'application/octet-stream'},
+        body: payload
+      });
+      await res.arrayBuffer();
+      const dt = now() - t0;
+      return { bytes, ms: dt };
+    }
+
+    async function run() {
+      aborter = new AbortController();
+      btnStart.disabled = true;
+      btnStop.disabled = false;
+
+      try {
+        elStatus.textContent = 'Measuring latency…';
+        const lat = await measureLatency('https://speed.cloudflare.com/__down?bytes=10000');
+        elLatency.textContent = lat.toFixed(0);
+
+        // Download test: ramp sizes; pick the best of a couple runs.
+        elStatus.textContent = 'Testing download…';
+        const downRuns = [];
+        for (const sz of [2_000_000, 8_000_000, 20_000_000]) {
+          const r = await downloadTest('https://speed.cloudflare.com/__down?bytes=', sz);
+          downRuns.push(r);
+          // stop early if already very fast
+          if (mbps(r.bytes, r.ms) > 300) break;
+        }
+        const bestDown = downRuns.reduce((a,b)=> mbps(a.bytes,a.ms) > mbps(b.bytes,b.ms) ? a : b);
+        elDown.textContent = mbps(bestDown.bytes, bestDown.ms).toFixed(1);
+
+        // Upload test (smaller to avoid murdering mobile connections)
+        elStatus.textContent = 'Testing upload…';
+        const upRuns = [];
+        for (const sz of [1_000_000, 4_000_000, 10_000_000]) {
+          const r = await uploadTest('https://speed.cloudflare.com/__up', sz);
+          upRuns.push(r);
+          if (mbps(r.bytes, r.ms) > 100) break;
+        }
+        const bestUp = upRuns.reduce((a,b)=> mbps(a.bytes,a.ms) > mbps(b.bytes,b.ms) ? a : b);
+        elUp.textContent = mbps(bestUp.bytes, bestUp.ms).toFixed(1);
+
+        elStatus.textContent = 'Done';
+      } catch (e) {
+        elStatus.textContent = 'Failed';
+      } finally {
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        aborter = null;
+      }
+    }
+
+    btnStart.addEventListener('click', run);
+    btnStop.addEventListener('click', () => {
+      if (aborter) aborter.abort();
+    });
+  </script>
+</body>
+</html>

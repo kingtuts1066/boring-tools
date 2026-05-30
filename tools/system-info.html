@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>System Info — Browser, device, screen, GPU (WebGL)</title>
+  <meta name="description" content="See useful system details your browser can safely report: CPU threads, RAM estimate, screen size, GPU renderer (WebGL), storage estimate, and more." />
+  <link rel="canonical" href="/tools/system-info.html" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="/index.html#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>System info</h1>
+      <p class="lede">A quick readout of what your browser can report (CPU threads, RAM estimate, screen, GPU renderer, storage estimate).</p>
+    </section>
+
+    <section class="card">
+      <h2>Device & browser</h2>
+      <ul class="facts">
+        <li><strong>User agent:</strong> <span id="ua">—</span></li>
+        <li><strong>Platform:</strong> <span id="platform">—</span></li>
+        <li><strong>Language:</strong> <span id="lang">—</span></li>
+        <li><strong>Timezone:</strong> <span id="tz">—</span></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Hardware (best-effort)</h2>
+      <ul class="facts">
+        <li><strong>CPU threads (logical):</strong> <span id="cpu">—</span></li>
+        <li><strong>Device memory (GB, estimate):</strong> <span id="ram">—</span></li>
+        <li><strong>Touch points:</strong> <span id="touch">—</span></li>
+      </ul>
+      <p class="small">Browsers intentionally limit hardware visibility for privacy. RAM/VRAM are often approximations or unavailable.</p>
+    </section>
+
+    <section class="card">
+      <h2>Screen & viewport</h2>
+      <ul class="facts">
+        <li><strong>Screen:</strong> <span id="screen">—</span></li>
+        <li><strong>Viewport:</strong> <span id="viewport">—</span></li>
+        <li><strong>Pixel ratio:</strong> <span id="dpr">—</span></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>GPU (WebGL)</h2>
+      <ul class="facts">
+        <li><strong>Renderer:</strong> <span id="gpu">—</span></li>
+      </ul>
+      <p class="small">This comes from WebGL. Some browsers hide it unless privacy settings allow it.</p>
+    </section>
+
+    <section class="card">
+      <h2>Storage estimate</h2>
+      <ul class="facts">
+        <li><strong>Quota:</strong> <span id="quota">—</span></li>
+        <li><strong>Usage:</strong> <span id="usage">—</span></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/tools/internet-speed-test.html">Internet speed test</a></li>
+        <li><a href="/tools/whats-my-ip.html">What’s my IP</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    $('ua').textContent = navigator.userAgent;
+    $('platform').textContent = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '—';
+    $('lang').textContent = navigator.language || '—';
+    try { $('tz').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || '—'; } catch { $('tz').textContent = '—'; }
+
+    $('cpu').textContent = (navigator.hardwareConcurrency || '—');
+    $('ram').textContent = (navigator.deviceMemory || '—');
+    $('touch').textContent = (navigator.maxTouchPoints ?? '—');
+
+    function setScreen() {
+      $('screen').textContent = `${screen.width}×${screen.height}`;
+      $('viewport').textContent = `${window.innerWidth}×${window.innerHeight}`;
+      $('dpr').textContent = String(window.devicePixelRatio || 1);
+    }
+    setScreen();
+    addEventListener('resize', setScreen);
+
+    // WebGL GPU renderer
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (!gl) {
+        $('gpu').textContent = 'WebGL unavailable';
+      } else {
+        const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+        const renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+        $('gpu').textContent = renderer || '—';
+      }
+    } catch {
+      $('gpu').textContent = '—';
+    }
+
+    // Storage estimate
+    async function storage() {
+      if (!navigator.storage || !navigator.storage.estimate) {
+        $('quota').textContent = 'Unavailable';
+        $('usage').textContent = 'Unavailable';
+        return;
+      }
+      const est = await navigator.storage.estimate();
+      const fmt = (n) => (n == null) ? '—' : (n/1024/1024).toFixed(0) + ' MB';
+      $('quota').textContent = fmt(est.quota);
+      $('usage').textContent = fmt(est.usage);
+    }
+    storage();
+  </script>
+</body>
+</html>
