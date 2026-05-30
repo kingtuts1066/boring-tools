@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stamp Duty (SDLT) Calculator — England & Northern Ireland</title>
+  <meta name="description" content="Stamp Duty Land Tax (SDLT) calculator for England & Northern Ireland: estimate SDLT for common residential purchases (standard rates, first-time buyer relief, additional property, non-UK resident)." />
+  <link rel="canonical" href="/tools/stamp-duty-calculator" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="/index.html#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Stamp Duty (SDLT) calculator</h1>
+      <p class="lede">Residential SDLT estimate for England & Northern Ireland. Includes first-time buyer relief, additional property (higher rates), and non-UK resident surcharge.</p>
+    </section>
+
+    <section class="card">
+      <h2>Inputs</h2>
+
+      <div class="grid">
+        <div>
+          <div class="field">
+            <label for="price">Property price (£)</label>
+            <input id="price" class="control" inputmode="decimal" autocomplete="off" placeholder="e.g. 295000" />
+          </div>
+
+          <div class="field">
+            <label for="buyer">Buyer situation</label>
+            <select id="buyer" class="control">
+              <option value="standard" selected>Only residential property you own (standard rates)</option>
+              <option value="first">First-time buyer (relief, price ≤ £500k)</option>
+              <option value="additional">Additional residential property (higher rates)</option>
+            </select>
+            <div class="help">Simplified residential SDLT for common cases (England & Northern Ireland).</div>
+          </div>
+
+          <div class="field">
+            <label for="nonresident">Non-UK resident surcharge?</label>
+            <select id="nonresident" class="control">
+              <option value="no" selected>No</option>
+              <option value="yes">Yes (+2%)</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <button id="reset" class="btn btn-ghost" type="button">Reset</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="margin:0">
+            <div class="label">Stamp Duty (SDLT)</div>
+            <div id="outTax" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Effective rate</div>
+            <div id="outEff" class="value">—</div>
+
+            <p id="status" class="small" style="margin-top:10px">Tip: try £295,000 to match the GOV.UK example.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart" aria-label="SDLT by band chart">
+        <svg id="chart" viewBox="0 0 600 180" width="100%" height="180" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="legend" aria-label="Chart legend">
+        <div class="legend-item"><span class="swatch" style="background:#2563eb"></span> SDLT by band</div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">Breakdown</h3>
+        <div id="breakdown" class="small">—</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Notes</h2>
+      <ul>
+        <li>England & Northern Ireland: SDLT. Scotland uses LBTT, Wales uses LTT.</li>
+        <li>For complex cases (shared ownership, leases, mixed-use, companies/trusts), use the official HMRC calculator.</li>
+      </ul>
+      <details>
+        <summary>Which residential band rates does this use (standard rates)?</summary>
+        <p>0% up to £125,000; 2% £125,001–£250,000; 5% £250,001–£925,000; 10% £925,001–£1.5m; 12% above £1.5m.</p>
+        <p>First-time buyer relief (simplified): 0% up to £300,000; 5% on £300,001–£500,000; only applies if the price is £500,000 or less.</p>
+      </details>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/tools/mortgage-calculator">Mortgage calculator</a></li>
+        <li><a href="/tools/vat-calculator">VAT calculator</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const priceEl = $('price');
+    const buyerEl = $('buyer');
+    const nonresEl = $('nonresident');
+
+    const outTax = $('outTax');
+    const outEff = $('outEff');
+    const statusEl = $('status');
+    const breakdownEl = $('breakdown');
+    const chart = $('chart');
+
+    function parseNum(s) {
+      if (typeof s !== 'string') return NaN;
+      const cleaned = s.replace(/,/g, '').trim();
+      if (!cleaned) return NaN;
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function fmtGBP(n) {
+      if (!Number.isFinite(n)) return '—';
+      return new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'GBP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(n);
+    }
+
+    function fmtPct(n) {
+      if (!Number.isFinite(n)) return '—';
+      return (n * 100).toFixed(2) + '%';
+    }
+
+    // Standard residential SDLT bands (England & NI)
+    const baseBands = [
+      { upTo: 125000, rate: 0.00 },
+      { upTo: 250000, rate: 0.02 },
+      { upTo: 925000, rate: 0.05 },
+      { upTo: 1500000, rate: 0.10 },
+      { upTo: Infinity, rate: 0.12 },
+    ];
+
+    function bandTax(price, bands, addRate) {
+      let prev = 0;
+      const rows = [];
+      let total = 0;
+      for (const b of bands) {
+        const cap = b.upTo;
+        const portion = Math.max(0, Math.min(price, cap) - prev);
+        if (portion > 0) {
+          const rate = b.rate + (addRate || 0);
+          const tax = portion * rate;
+          total += tax;
+          rows.push({ prev, cap: Math.min(price, cap), portion, rate, tax });
+        }
+        prev = cap;
+        if (price <= cap) break;
+      }
+      return { total, rows };
+    }
+
+    function drawBars(rows) {
+      const w = 600, h = 180;
+      chart.innerHTML = '';
+      if (!rows.length) return;
+
+      const max = Math.max(...rows.map(r => r.tax), 1);
+      const pad = 14;
+      const innerW = w - pad * 2;
+      const innerH = h - pad * 2;
+      const barW = innerW / rows.length;
+
+      let svg = `<rect x="0" y="0" width="${w}" height="${h}" fill="transparent"></rect>`;
+      rows.forEach((r, i) => {
+        const bh = (r.tax / max) * innerH;
+        const x = pad + i * barW + barW * 0.15;
+        const y = pad + (innerH - bh);
+        const bw = barW * 0.7;
+        svg += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="6" ry="6" fill="#2563eb"></rect>`;
+      });
+      chart.innerHTML = svg;
+    }
+
+    function fmtBand(prev, cap) {
+      const from = prev === 0 ? 0 : (prev + 1);
+      return `£${from.toLocaleString('en-GB')}–£${cap.toLocaleString('en-GB')}`;
+    }
+
+    function calc() {
+      const price = parseNum(priceEl.value);
+      const buyer = buyerEl.value;
+      const nonres = nonresEl.value === 'yes';
+
+      outTax.textContent = '£—';
+      outEff.textContent = '—';
+      breakdownEl.textContent = '—';
+      chart.innerHTML = '';
+
+      if (!Number.isFinite(price) || price <= 0) { statusEl.textContent = 'Enter a valid property price.'; return; }
+
+      const extra = (buyer === 'additional' ? 0.05 : 0) + (nonres ? 0.02 : 0);
+
+      if (buyer === 'first') {
+        if (price > 500000) {
+          statusEl.textContent = 'First-time buyer relief only applies up to £500,000 in this simplified tool. Switch to standard rates.';
+        }
+
+        const ftBands = [
+          { upTo: 300000, rate: 0.00 },
+          { upTo: 500000, rate: 0.05 },
+          { upTo: Infinity, rate: 0.05 },
+        ];
+
+        const res = bandTax(price, ftBands, extra);
+        outTax.textContent = fmtGBP(res.total);
+        outEff.textContent = fmtPct(res.total / price);
+        breakdownEl.innerHTML = res.rows.map(r => {
+          return `<div>${fmtGBP(r.tax)} on ${fmtGBP(r.portion)} at ${(r.rate*100).toFixed(2)}% (${fmtBand(r.prev, r.cap)})</div>`;
+        }).join('');
+        drawBars(res.rows);
+        statusEl.textContent = 'Updated.';
+        return;
+      }
+
+      const res = bandTax(price, baseBands, extra);
+      outTax.textContent = fmtGBP(res.total);
+      outEff.textContent = fmtPct(res.total / price);
+      breakdownEl.innerHTML = res.rows.map(r => {
+        return `<div>${fmtGBP(r.tax)} on ${fmtGBP(r.portion)} at ${(r.rate*100).toFixed(2)}% (${fmtBand(r.prev, r.cap)})</div>`;
+      }).join('');
+      drawBars(res.rows);
+      statusEl.textContent = 'Updated.';
+    }
+
+    $('reset').addEventListener('click', () => {
+      priceEl.value = '295000';
+      buyerEl.value = 'standard';
+      nonresEl.value = 'no';
+      calc();
+    });
+
+    for (const el of [priceEl, buyerEl, nonresEl]) {
+      el.addEventListener('input', calc);
+      el.addEventListener('change', calc);
+    }
+
+    priceEl.value = '295000';
+    calc();
+  </script>
+</body>
+</html>

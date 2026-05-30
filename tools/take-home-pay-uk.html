@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Take-Home Pay Calculator (UK) — Estimate net pay</title>
+  <meta name="description" content="UK take-home pay calculator (estimate): income tax + employee National Insurance (Class 1). Shows weekly, monthly, yearly net and a simple breakdown chart." />
+  <link rel="canonical" href="/tools/take-home-pay-uk" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="/index.html#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Take-home pay calculator (UK)</h1>
+      <p class="lede">A quick employee estimate: Income Tax + employee National Insurance (Class 1). Outputs weekly, monthly, and yearly — plus a simple breakdown chart.</p>
+    </section>
+
+    <section class="card">
+      <h2>Inputs</h2>
+
+      <div class="grid">
+        <div>
+          <div class="field">
+            <label for="salary">Gross salary (£/year)</label>
+            <input id="salary" class="control" inputmode="decimal" autocomplete="off" placeholder="e.g. 45000" />
+          </div>
+
+          <div class="field">
+            <label for="pension">Pension contribution (% of salary)</label>
+            <input id="pension" class="control" inputmode="decimal" autocomplete="off" placeholder="e.g. 5" />
+            <div class="help">Simple assumption: salary sacrifice (reduces taxable + NI pay). If you’re using a different scheme, treat this as an estimate.</div>
+          </div>
+
+          <div class="field">
+            <label for="taxYear">Tax year</label>
+            <select id="taxYear" class="control">
+              <option value="2026" selected>2026–2027 (6 April 2026 to 5 April 2027)</option>
+            </select>
+            <div class="help">Bands/allowance based on GOV.UK pages for this tax year (England/Wales/N. Ireland).</div>
+          </div>
+
+          <div class="row">
+            <button id="reset" class="btn btn-ghost" type="button">Reset</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="margin:0">
+            <div class="label">Net pay (monthly)</div>
+            <div id="outNetM" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Net pay (yearly)</div>
+            <div id="outNetY" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">Income tax (yearly)</div>
+            <div id="outTaxY" class="value">£—</div>
+
+            <div class="label" style="margin-top:14px">National Insurance (yearly)</div>
+            <div id="outNiY" class="value">£—</div>
+
+            <p id="status" class="small" style="margin-top:10px">Tip: change salary to see how deductions move.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:10px">
+        <div class="card" style="margin:0">
+          <div class="label">Weekly net</div>
+          <div id="outNetW" class="value">£—</div>
+          <div class="small" id="outWDetail"></div>
+        </div>
+        <div class="card" style="margin:0">
+          <div class="label">Monthly net</div>
+          <div id="outNetM2" class="value">£—</div>
+          <div class="small" id="outMDetail"></div>
+        </div>
+      </div>
+
+      <div class="chart" aria-label="Take-home breakdown chart">
+        <svg id="chart" viewBox="0 0 600 180" width="100%" height="180" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="legend" aria-label="Chart legend">
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span> Net</div>
+        <div class="legend-item"><span class="swatch" style="background:#2563eb"></span> Income tax</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span> NI</div>
+        <div class="legend-item"><span class="swatch" style="background:#6b7280"></span> Pension</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Notes</h2>
+      <ul>
+        <li>This is a simplified employee estimate (no student loan, no childcare, no benefits in kind, no tax code adjustments beyond the default allowance/taper).</li>
+        <li>Scotland has different income tax bands — this page currently uses England/Wales/Northern Ireland bands.</li>
+      </ul>
+      <details>
+        <summary>What bands does this use (2026–2027)?</summary>
+        <p>Personal Allowance: £12,570. Income tax rates: 20% up to £50,270; 40% up to £125,140; 45% above. Allowance tapers from £100,000 to zero at £125,140.</p>
+        <p>National Insurance (Category A, employee): 0% up to £242/week; 8% from £242.01 to £967/week; 2% above £967/week.</p>
+      </details>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/tools/vat-calculator">VAT calculator</a></li>
+        <li><a href="/tools/mortgage-calculator">Mortgage calculator</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const salaryEl = $('salary');
+    const pensionEl = $('pension');
+
+    const outNetW = $('outNetW');
+    const outNetM = $('outNetM');
+    const outNetM2 = $('outNetM2');
+    const outNetY = $('outNetY');
+    const outTaxY = $('outTaxY');
+    const outNiY = $('outNiY');
+    const outWDetail = $('outWDetail');
+    const outMDetail = $('outMDetail');
+    const statusEl = $('status');
+    const chart = $('chart');
+
+    function parseNum(s) {
+      if (typeof s !== 'string') return NaN;
+      const cleaned = s.replace(/,/g, '').trim();
+      if (!cleaned) return NaN;
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function fmtGBP(n, decimals = 2) {
+      if (!Number.isFinite(n)) return '—';
+      return new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'GBP',
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(n);
+    }
+
+    function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+    // 2026-27 (England/Wales/N. Ireland) — based on GOV.UK income tax bands page
+    const TAX = {
+      pa: 12570,
+      paTaperStart: 100000,
+      paZeroAt: 125140,
+      bands: [
+        { upTo: 50270, rate: 0.20 },
+        { upTo: 125140, rate: 0.40 },
+        { upTo: Infinity, rate: 0.45 },
+      ]
+    };
+
+    // 2026-27 NI employee (Category A) weekly bands — based on GOV.UK NI rates page
+    const NI = {
+      weekly: [
+        { upTo: 242, rate: 0.00 },
+        { upTo: 967, rate: 0.08 },
+        { upTo: Infinity, rate: 0.02 },
+      ]
+    };
+
+    function personalAllowance(income) {
+      let pa = TAX.pa;
+      if (income <= TAX.paTaperStart) return pa;
+      const over = income - TAX.paTaperStart;
+      pa = pa - (over / 2);
+      if (income >= TAX.paZeroAt) pa = 0;
+      return Math.max(0, Math.floor(pa));
+    }
+
+    function incomeTaxAnnual(income) {
+      const pa = personalAllowance(income);
+      let taxable = Math.max(0, income - pa);
+
+      const baseLimitTaxable = Math.max(0, TAX.bands[0].upTo - TAX.pa);
+      const higherLimitTaxable = Math.max(0, TAX.bands[1].upTo - TAX.pa);
+
+      let tax = 0;
+      const band1 = Math.min(taxable, baseLimitTaxable);
+      tax += band1 * 0.20;
+      taxable -= band1;
+
+      const band2 = Math.min(taxable, Math.max(0, higherLimitTaxable - baseLimitTaxable));
+      tax += band2 * 0.40;
+      taxable -= band2;
+
+      if (taxable > 0) tax += taxable * 0.45;
+      return tax;
+    }
+
+    function niAnnual(grossAnnual) {
+      const weekly = grossAnnual / 52;
+      let prev = 0;
+      let niW = 0;
+      for (const b of NI.weekly) {
+        const cap = b.upTo;
+        const portion = Math.max(0, Math.min(weekly, cap) - prev);
+        niW += portion * b.rate;
+        prev = cap;
+        if (weekly <= cap) break;
+      }
+      return niW * 52;
+    }
+
+    function drawStack({ net, tax, ni, pension }) {
+      const w = 600, h = 180;
+      const pad = 18;
+      const innerW = w - pad * 2;
+      const barH = 44;
+      const y = (h - barH) / 2;
+
+      const total = net + tax + ni + pension;
+      if (!(total > 0)) { chart.innerHTML = ''; return; }
+
+      const parts = [
+        { v: net, c: '#10b981' },
+        { v: tax, c: '#2563eb' },
+        { v: ni, c: '#f59e0b' },
+        { v: pension, c: '#6b7280' },
+      ];
+
+      let x = pad;
+      let svg = `<rect x="0" y="0" width="${w}" height="${h}" fill="transparent"></rect>`;
+      parts.forEach((p, i) => {
+        const bw = innerW * (p.v / total);
+        if (bw <= 0) return;
+        const rx = (i === 0 || i === parts.length - 1) ? 10 : 0;
+        svg += `<rect x="${x}" y="${y}" width="${bw}" height="${barH}" rx="${rx}" ry="${rx}" fill="${p.c}"></rect>`;
+        x += bw;
+      });
+      chart.innerHTML = svg;
+    }
+
+    function calc() {
+      const salary = parseNum(salaryEl.value);
+      const pensionPct = parseNum(pensionEl.value);
+
+      outNetW.textContent = '£—';
+      outNetM.textContent = '£—';
+      outNetM2.textContent = '£—';
+      outNetY.textContent = '£—';
+      outTaxY.textContent = '£—';
+      outNiY.textContent = '£—';
+      outWDetail.textContent = '';
+      outMDetail.textContent = '';
+      chart.innerHTML = '';
+
+      if (!Number.isFinite(salary) || salary <= 0) { statusEl.textContent = 'Enter a valid annual salary.'; return; }
+
+      const pPct = Number.isFinite(pensionPct) ? clamp(pensionPct, 0, 50) : 0;
+      const pension = salary * (pPct / 100);
+      const adj = Math.max(0, salary - pension);
+
+      const taxY = incomeTaxAnnual(adj);
+      const niY = niAnnual(adj);
+      const netY = Math.max(0, adj - taxY - niY);
+
+      outNetW.textContent = fmtGBP(netY / 52, 2);
+      outNetM.textContent = fmtGBP(netY / 12, 2);
+      outNetM2.textContent = fmtGBP(netY / 12, 2);
+      outNetY.textContent = fmtGBP(netY, 0);
+      outTaxY.textContent = fmtGBP(taxY, 0);
+      outNiY.textContent = fmtGBP(niY, 0);
+
+      outWDetail.textContent = `Tax/NI/pension per week (approx): ${fmtGBP(taxY/52,2)} tax, ${fmtGBP(niY/52,2)} NI, ${fmtGBP(pension/52,2)} pension`;
+      outMDetail.textContent = `Tax/NI/pension per month (approx): ${fmtGBP(taxY/12,2)} tax, ${fmtGBP(niY/12,2)} NI, ${fmtGBP(pension/12,2)} pension`;
+
+      drawStack({ net: netY, tax: taxY, ni: niY, pension });
+      statusEl.textContent = 'Updated.';
+    }
+
+    $('reset').addEventListener('click', () => {
+      salaryEl.value = '45000';
+      pensionEl.value = '5';
+      calc();
+    });
+
+    for (const el of [salaryEl, pensionEl]) {
+      el.addEventListener('input', calc);
+      el.addEventListener('change', calc);
+    }
+
+    salaryEl.value = '45000';
+    pensionEl.value = '5';
+    calc();
+  </script>
+</body>
+</html>
