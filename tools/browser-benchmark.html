@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Browser Benchmark (UK) — Quick performance smoke test</title>
+  <meta name="description" content="A lightweight browser benchmark: JS compute, DOM ops, JSON stringify, and canvas. Useful for quick performance comparisons." />
+  <link rel="canonical" href="/tools/browser-benchmark.html" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="/index.html#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Browser benchmark</h1>
+      <p class="lede">A quick, boring performance smoke test (not a scientific benchmark). Great for comparing devices, browsers, or power modes.</p>
+    </section>
+
+    <section class="card">
+      <h2>Run</h2>
+      <p class="muted">Close heavy tabs for more consistent results. Run it 2–3 times and look for the typical range.</p>
+
+      <div class="grid">
+        <div>
+          <div class="label">Overall score</div>
+          <div id="score" class="value">—</div>
+        </div>
+        <div>
+          <div class="label">Status</div>
+          <div id="status" class="value" style="font-size:16px;font-weight:650">Idle</div>
+        </div>
+      </div>
+
+      <p style="margin-top:14px">
+        <button id="run" class="btn">Run benchmark</button>
+      </p>
+
+      <div class="small muted">Scores are relative and depend on browser optimisations. Don’t treat it as a universal truth — use it as a quick signal.</div>
+    </section>
+
+    <section class="card">
+      <h2>Details</h2>
+      <ul id="details" class="tool-list"></ul>
+      <div class="small muted" style="margin-top:10px">Each test reports elapsed time. Lower is better.</div>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/tools/system-info.html">System info</a></li>
+        <li><a href="/tools/internet-speed-test.html">Internet speed test</a></li>
+        <li><a href="/tools/webrtc-leak-test.html">WebRTC leak test</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    // Minimal button styling without a framework
+    const style = document.createElement('style');
+    style.textContent = `
+      .btn{appearance:none;border:1px solid var(--border2);background:color-mix(in srgb, var(--bg1) 72%, transparent);
+        color:var(--text);padding:10px 14px;border-radius:999px;font-weight:650;cursor:pointer;box-shadow:0 1px 0 rgba(17,24,39,.04)}
+      .btn:hover{box-shadow:var(--shadow2)}
+      .btn:focus{outline:none;box-shadow:var(--ring)}
+      .btn:disabled{opacity:.5;cursor:not-allowed}
+    `;
+    document.head.appendChild(style);
+
+    const $ = (id) => document.getElementById(id);
+    const elScore = $('score');
+    const elStatus = $('status');
+    const elDetails = $('details');
+    const btnRun = $('run');
+
+    function setStatus(s) { elStatus.textContent = s; }
+
+    function addDetail(name, ms) {
+      const li = document.createElement('li');
+      li.innerHTML = `<a href="#" onclick="return false">${name}</a><span class="meta">${ms.toFixed(1)} ms</span>`;
+      elDetails.appendChild(li);
+    }
+
+    function hrtime() { return performance.now(); }
+
+    function testJsCompute() {
+      const t0 = hrtime();
+      let x = 0;
+      for (let i = 1; i < 400000; i++) x = (x + Math.sqrt(i)) % 12345.678;
+      const t1 = hrtime();
+      // prevent optimisation
+      if (x === 42) console.log('');
+      return t1 - t0;
+    }
+
+    function testJson() {
+      const obj = { a: [], t: Date.now(), s: 'benchmark' };
+      for (let i = 0; i < 15000; i++) obj.a.push({ i, v: (i*i)%97, str: 'x'.repeat(i%20) });
+      const t0 = hrtime();
+      const s = JSON.stringify(obj);
+      const t1 = hrtime();
+      if (s.length < 10) throw new Error('bad');
+      return t1 - t0;
+    }
+
+    function testDom() {
+      const root = document.createElement('div');
+      const t0 = hrtime();
+      for (let i = 0; i < 3000; i++) {
+        const d = document.createElement('div');
+        d.textContent = 'row ' + i;
+        d.className = 'muted';
+        root.appendChild(d);
+      }
+      document.body.appendChild(root);
+      const t1 = hrtime();
+      root.remove();
+      return t1 - t0;
+    }
+
+    function testCanvas() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      const t0 = hrtime();
+      for (let i = 0; i < 4000; i++) {
+        ctx.fillStyle = `rgb(${i%255},${(i*7)%255},${(i*13)%255})`;
+        ctx.fillRect(i%512, (i*3)%512, 40, 40);
+      }
+      const t1 = hrtime();
+      return t1 - t0;
+    }
+
+    function scoreFrom(times) {
+      const total = times.reduce((a,b)=>a+b,0);
+      const raw = 100000 / Math.max(1, total);
+      return Math.round(raw * 100) / 100;
+    }
+
+    async function run() {
+      btnRun.disabled = true;
+      elDetails.innerHTML = '';
+      elScore.textContent = '—';
+      setStatus('Running…');
+
+      try {
+        await new Promise(r => setTimeout(r, 60));
+
+        const tCompute = testJsCompute();
+        addDetail('JS compute loop', tCompute);
+
+        await new Promise(r => setTimeout(r, 20));
+        const tJson = testJson();
+        addDetail('JSON stringify', tJson);
+
+        await new Promise(r => setTimeout(r, 20));
+        const tDom = testDom();
+        addDetail('DOM create/append', tDom);
+
+        await new Promise(r => setTimeout(r, 20));
+        const tCanvas = testCanvas();
+        addDetail('Canvas fill', tCanvas);
+
+        const score = scoreFrom([tCompute, tJson, tDom, tCanvas]);
+        elScore.textContent = String(score);
+        setStatus('Done');
+      } catch (e) {
+        setStatus('Error');
+      } finally {
+        btnRun.disabled = false;
+      }
+    }
+
+    btnRun.addEventListener('click', run);
+  </script>
+</body>
+</html>

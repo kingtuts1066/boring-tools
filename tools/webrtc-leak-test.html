@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WebRTC Leak Test (UK) — Check IP leaks for VPNs</title>
+  <meta name="description" content="Run a WebRTC leak test in your browser. See what IP addresses WebRTC can expose (useful for VPN troubleshooting)." />
+  <link rel="canonical" href="/tools/webrtc-leak-test.html" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="/index.html#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>WebRTC leak test</h1>
+      <p class="lede">Checks what IP addresses your browser may reveal via WebRTC ICE candidates. Useful for VPN/privacy troubleshooting.</p>
+    </section>
+
+    <section class="card">
+      <h2>Run test</h2>
+      <p class="muted">Modern browsers often hide local IPs (mDNS) by design, so you may only see public/relay addresses.</p>
+
+      <div class="grid">
+        <div>
+          <div class="label">Status</div>
+          <div id="status" class="value" style="font-size:16px;font-weight:650">Idle</div>
+        </div>
+        <div>
+          <div class="label">Found candidates</div>
+          <div id="count" class="value">0</div>
+        </div>
+      </div>
+
+      <p style="margin-top:14px">
+        <button id="start" class="btn">Start</button>
+        <button id="stop" class="btn secondary" disabled>Stop</button>
+      </p>
+
+      <div class="small muted">We use a standard STUN server to gather ICE candidates. Nothing is sent to this site — the browser talks directly to the STUN service.</div>
+    </section>
+
+    <section class="card">
+      <h2>Results</h2>
+      <ul id="list" style="list-style:none;padding-left:0;margin:0"></ul>
+      <div id="empty" class="small muted" style="margin-top:10px">Run the test to see any discovered candidates.</div>
+    </section>
+
+    <section>
+      <h2>How to interpret this</h2>
+      <ul>
+        <li><strong>srflx</strong> = server reflexive (your public IP as seen via STUN)</li>
+        <li><strong>host</strong> = local interface (often hidden by mDNS like <code>xxxx.local</code>)</li>
+        <li><strong>relay</strong> = TURN relay (commonly used by some VPN/browser setups)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/tools/whats-my-ip.html">What’s my IP</a></li>
+        <li><a href="/tools/dns-lookup.html">DNS lookup</a></li>
+        <li><a href="/tools/system-info.html">System info</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    // Minimal button styling without a framework
+    const style = document.createElement('style');
+    style.textContent = `
+      .btn{appearance:none;border:1px solid var(--border2);background:color-mix(in srgb, var(--bg1) 72%, transparent);
+        color:var(--text);padding:10px 14px;border-radius:999px;font-weight:650;cursor:pointer;box-shadow:0 1px 0 rgba(17,24,39,.04)}
+      .btn:hover{box-shadow:var(--shadow2)}
+      .btn:focus{outline:none;box-shadow:var(--ring)}
+      .btn.secondary{opacity:.9}
+      .btn:disabled{opacity:.5;cursor:not-allowed}
+    `;
+    document.head.appendChild(style);
+
+    const $ = (id) => document.getElementById(id);
+    const elStatus = $('status');
+    const elCount = $('count');
+    const elList = $('list');
+    const elEmpty = $('empty');
+    const btnStart = $('start');
+    const btnStop = $('stop');
+
+    let pc = null;
+    const seen = new Set();
+
+    function setStatus(s) { elStatus.textContent = s; }
+
+    function addRow(title, detail) {
+      const li = document.createElement('li');
+      li.className = 'card';
+      li.style.margin = '10px 0';
+      li.innerHTML = `<div class="label">${title}</div><div class="value" style="font-size:14px;white-space:pre-wrap;word-break:break-word">${detail.replace(/</g,'&lt;')}</div>`;
+      elList.appendChild(li);
+      elEmpty.style.display = 'none';
+    }
+
+    function parseCandidate(c) {
+      const mType = c.match(/\btyp\s+(host|srflx|relay|prflx)\b/i);
+      const type = mType ? mType[1].toLowerCase() : 'unknown';
+
+      // Pull an IPv4 or IPv6 if present. If mDNS is used, it may be absent.
+      const mV4 = c.match(/\b(\d{1,3}(?:\.\d{1,3}){3})\b/);
+      const mV6 = c.match(/\b([0-9a-fA-F:]{2,})\b/);
+      const ip = (mV4 && mV4[1]) || (mV6 && mV6[1]) || null;
+
+      return { type, ip, raw: c };
+    }
+
+    async function start() {
+      if (!window.RTCPeerConnection) {
+        setStatus('WebRTC not supported');
+        return;
+      }
+
+      btnStart.disabled = true;
+      btnStop.disabled = false;
+      elList.innerHTML = '';
+      seen.clear();
+      elCount.textContent = '0';
+      elEmpty.style.display = '';
+      setStatus('Gathering candidates…');
+
+      pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+
+      pc.addEventListener('icecandidate', (e) => {
+        if (!e.candidate || !e.candidate.candidate) return;
+        const parsed = parseCandidate(e.candidate.candidate);
+        const key = `${parsed.type}|${parsed.ip || parsed.raw}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        elCount.textContent = String(seen.size);
+        addRow(`${parsed.type.toUpperCase()} — ${parsed.ip ? parsed.ip : '(hidden / mDNS)'}`, e.candidate.candidate);
+      });
+
+      try {
+        const offer = await pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+        await pc.setLocalDescription(offer);
+      } catch (e) {
+        setStatus('Error');
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        return;
+      }
+
+      setTimeout(() => {
+        if (!pc) return;
+        if (seen.size === 0) setStatus('No candidates (or blocked)');
+        else setStatus('Done');
+        stop();
+      }, 4500);
+    }
+
+    function stop() {
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+      if (pc) {
+        try { pc.close(); } catch {}
+      }
+      pc = null;
+    }
+
+    btnStart.addEventListener('click', start);
+    btnStop.addEventListener('click', stop);
+  </script>
+</body>
+</html>

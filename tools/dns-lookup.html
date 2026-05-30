@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DNS Lookup (UK) — Query A/AAAA/MX/TXT via DoH</title>
+  <meta name="description" content="Run a DNS lookup in your browser using DNS-over-HTTPS (DoH). Query A, AAAA, MX, TXT and more. No install." />
+  <link rel="canonical" href="/tools/dns-lookup.html" />
+  <meta name="robots" content="index,follow" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/index.html">Boring Tools UK</a>
+      <nav class="nav">
+        <a href="/index.html#tools">Tools</a>
+        <a href="/about.html">About</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>DNS lookup</h1>
+      <p class="lede">Look up DNS records (A/AAAA/MX/TXT/CNAME/NS) using DNS-over-HTTPS. Handy for debugging domains and email setups.</p>
+    </section>
+
+    <section class="card">
+      <h2>Query</h2>
+      <div class="grid">
+        <div>
+          <label class="label" for="name">Domain or hostname</label>
+          <input id="name" class="search" inputmode="url" placeholder="example.co.uk" autocomplete="off" />
+          <div class="small muted" style="margin-top:6px">Tip: try <code>www.bbc.co.uk</code> or your own domain.</div>
+        </div>
+        <div>
+          <label class="label" for="type">Record type</label>
+          <select id="type" class="search" style="appearance:auto">
+            <option>A</option>
+            <option>AAAA</option>
+            <option>CNAME</option>
+            <option>MX</option>
+            <option>TXT</option>
+            <option>NS</option>
+            <option>SOA</option>
+            <option>CAA</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:12px">
+        <div>
+          <label class="label" for="resolver">Resolver</label>
+          <select id="resolver" class="search" style="appearance:auto">
+            <option value="cloudflare" selected>Cloudflare DoH (cloudflare-dns.com)</option>
+            <option value="google">Google DoH (dns.google)</option>
+          </select>
+        </div>
+        <div>
+          <div class="label">Status</div>
+          <div id="status" class="value" style="font-size:16px;font-weight:650">Idle</div>
+        </div>
+      </div>
+
+      <p style="margin-top:14px">
+        <button id="run" class="btn">Lookup</button>
+        <button id="copy" class="btn secondary" disabled>Copy JSON</button>
+      </p>
+
+      <div class="small muted">This uses public DNS-over-HTTPS endpoints. Your query is sent to the selected resolver (not stored by this site).</div>
+    </section>
+
+    <section class="card">
+      <h2>Results</h2>
+      <pre id="out" class="code" style="white-space:pre-wrap;word-break:break-word;margin:0">Run a lookup to see raw results…</pre>
+      <div class="small muted" style="margin-top:8px">Note: Some records (like TXT) can be long; raw JSON is shown for accuracy.</div>
+    </section>
+
+    <section>
+      <h2>FAQ</h2>
+      <details>
+        <summary>Why does this differ from my local DNS results?</summary>
+        <p>Resolvers can differ (caching, geo-routing, filtering). This tool queries the chosen public resolver via HTTPS from your browser.</p>
+      </details>
+      <details>
+        <summary>Can this check DNS propagation?</summary>
+        <p>Partially. You can switch resolvers, but true propagation checks require querying many resolvers worldwide.</p>
+      </details>
+    </section>
+
+    <section>
+      <h2>Related tools</h2>
+      <ul>
+        <li><a href="/tools/whats-my-ip.html">What’s my IP</a></li>
+        <li><a href="/tools/internet-speed-test.html">Internet speed test</a></li>
+        <li><a href="/tools/system-info.html">System info</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p><a href="/privacy.html">Privacy</a> · <a href="/about.html">About</a> · <a href="/contact.html">Contact</a></p>
+  </footer>
+
+  <script>
+    // Minimal button styling without a framework
+    const style = document.createElement('style');
+    style.textContent = `
+      .btn{appearance:none;border:1px solid var(--border2);background:color-mix(in srgb, var(--bg1) 72%, transparent);
+        color:var(--text);padding:10px 14px;border-radius:999px;font-weight:650;cursor:pointer;box-shadow:0 1px 0 rgba(17,24,39,.04)}
+      .btn:hover{box-shadow:var(--shadow2)}
+      .btn:focus{outline:none;box-shadow:var(--ring)}
+      .btn.secondary{opacity:.9}
+      .btn:disabled{opacity:.5;cursor:not-allowed}
+      .code{border:1px solid var(--border2);background:color-mix(in srgb, var(--bg1) 82%, transparent);border-radius:16px;padding:14px}
+      select.search{padding-top:10px;padding-bottom:10px}
+    `;
+    document.head.appendChild(style);
+
+    const $ = (id) => document.getElementById(id);
+    const elName = $('name');
+    const elType = $('type');
+    const elResolver = $('resolver');
+    const elStatus = $('status');
+    const elOut = $('out');
+    const btnRun = $('run');
+    const btnCopy = $('copy');
+
+    let lastJson = null;
+
+    function setStatus(s) { elStatus.textContent = s; }
+
+    function normaliseName(s) {
+      s = (s || '').trim();
+      if (!s) return '';
+      // strip scheme/path if user pasted a URL
+      try {
+        if (s.includes('://')) s = new URL(s).hostname;
+      } catch {}
+      s = s.replace(/\s+/g,'');
+      return s;
+    }
+
+    function dohUrl(resolver, name, type) {
+      const q = `name=${encodeURIComponent(name)}&type=${encodeURIComponent(type)}`;
+      if (resolver === 'google') return `https://dns.google/resolve?${q}`;
+      // Cloudflare JSON format
+      return `https://cloudflare-dns.com/dns-query?${q}`;
+    }
+
+    async function run() {
+      const name = normaliseName(elName.value);
+      const type = (elType.value || 'A').trim();
+      const resolver = elResolver.value;
+
+      if (!name) {
+        setStatus('Enter a domain');
+        elName.focus();
+        return;
+      }
+
+      setStatus('Looking up…');
+      btnRun.disabled = true;
+      btnCopy.disabled = true;
+      lastJson = null;
+
+      try {
+        const url = dohUrl(resolver, name, type);
+        const res = await fetch(url, {
+          cache: 'no-store',
+          headers: {
+            'accept': 'application/dns-json'
+          }
+        });
+        const json = await res.json();
+        lastJson = { resolver, name, type, fetchedAt: new Date().toISOString(), response: json };
+        elOut.textContent = JSON.stringify(lastJson, null, 2);
+        setStatus(res.ok ? 'OK' : `HTTP ${res.status}`);
+        btnCopy.disabled = false;
+      } catch (e) {
+        setStatus('Error');
+        elOut.textContent = `Error: ${e && e.message ? e.message : String(e)}`;
+      } finally {
+        btnRun.disabled = false;
+      }
+    }
+
+    btnRun.addEventListener('click', run);
+    elName.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+
+    btnCopy.addEventListener('click', async () => {
+      if (!lastJson) return;
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(lastJson, null, 2));
+        setStatus('Copied');
+        setTimeout(() => setStatus('OK'), 900);
+      } catch {
+        setStatus('Copy blocked');
+      }
+    });
+
+    // sensible default
+    elName.value = 'bbc.co.uk';
+  </script>
+</body>
+</html>
