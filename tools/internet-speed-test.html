@@ -169,7 +169,8 @@
       }
 
       const t0 = now();
-      // Same-origin endpoint avoids third-party blocks and CORS issues.
+      // Upload often gets blocked by VPNs/privacy tools because it targets a third-party endpoint.
+      // We handle that gracefully by keeping latency+download even if upload fails.
       const res = await fetchOk(url + '?_=' + Math.random(), {
         method: 'POST',
         body: payload
@@ -201,9 +202,9 @@
       elUp.textContent = '—';
 
       try {
-        // 1) Latency (same-origin ping)
+        // 1) Latency
         setStatus('Measuring latency…');
-        const lat = await measureLatency('/api/ping?x=1');
+        const lat = await measureLatency('https://speed.cloudflare.com/__down?bytes=10000');
         elLatency.textContent = lat.toFixed(0);
 
         // 2) Download
@@ -225,7 +226,7 @@
         try {
           const upRuns = [];
           for (const sz of [500_000, 1_000_000, 4_000_000]) {
-            const r = await uploadTest('/api/upload', sz);
+            const r = await uploadTest('https://speed.cloudflare.com/__up', sz);
             upRuns.push(r);
             if (mbps(r.bytes, r.ms) > 100) break;
           }
