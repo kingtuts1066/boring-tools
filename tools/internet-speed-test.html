@@ -144,7 +144,7 @@
       const times = [];
       for (let i = 0; i < samples; i++) {
         const t0 = now();
-        const res = await fetchOk(url + '&_=' + Math.random());
+        const res = await fetchOk(url + '&_=' + Math.random(), undefined, 8000);
         await res.arrayBuffer();
         times.push(now() - t0);
       }
@@ -154,7 +154,7 @@
 
     async function downloadTest(baseUrl, bytes) {
       const t0 = now();
-      const res = await fetchOk(baseUrl + bytes + '&_=' + Math.random());
+      const res = await fetchOk(baseUrl + bytes + '&_=' + Math.random(), undefined, 25000);
       const buf = await res.arrayBuffer();
       const dt = now() - t0;
       return { bytes: buf.byteLength, ms: dt };
@@ -169,13 +169,11 @@
       }
 
       const t0 = now();
-      // IMPORTANT: do NOT set a custom Content-Type header here.
-      // Setting it triggers a CORS preflight on some browsers/networks, which can be blocked and show as "Failed to fetch".
-      // Sending Uint8Array without a header is still fine for timing purposes.
+      // Same-origin endpoint avoids third-party blocks and CORS issues.
       const res = await fetchOk(url + '?_=' + Math.random(), {
         method: 'POST',
         body: payload
-      });
+      }, 25000);
       await res.arrayBuffer();
       const dt = now() - t0;
       return { bytes, ms: dt };
@@ -203,9 +201,9 @@
       elUp.textContent = '—';
 
       try {
-        // 1) Latency
+        // 1) Latency (same-origin ping)
         setStatus('Measuring latency…');
-        const lat = await measureLatency('https://speed.cloudflare.com/__down?bytes=10000');
+        const lat = await measureLatency('/api/ping?x=1');
         elLatency.textContent = lat.toFixed(0);
 
         // 2) Download
@@ -227,7 +225,7 @@
         try {
           const upRuns = [];
           for (const sz of [500_000, 1_000_000, 4_000_000]) {
-            const r = await uploadTest('https://speed.cloudflare.com/__up', sz);
+            const r = await uploadTest('/api/upload', sz);
             upRuns.push(r);
             if (mbps(r.bytes, r.ms) > 100) break;
           }
